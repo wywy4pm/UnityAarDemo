@@ -1,0 +1,2 @@
+rootProject.name = "UnityAarDemo"
+include ':unityaar'
