@@ -13,6 +13,7 @@ import android.location.GnssStatus;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.location.OnNmeaMessageListener;
 import android.os.Build;
 import android.util.Log;
 
@@ -22,6 +23,7 @@ public class LocationHelper {
     public static final String TAG = "LocationHelper";
     public static boolean hasPermission = false;
     public static LocationData curLocationData;
+    private static double altitude;
 
     public static boolean hasLocationPermission(Context context) {
         String[] noPerArray = PermissionUtils.hasPermission(context);
@@ -35,37 +37,41 @@ public class LocationHelper {
         PermissionActivity.jumpPermission(context);
     }
 
-    static Sensor sensor;
-    static float presure;
     @SuppressLint("MissingPermission")
     @TargetApi(Build.VERSION_CODES.N)
     public static void requestLocationData(Activity context) {
         if (context != null) {
-            SensorManager sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
-            List<Sensor> sensors = sensorManager.getSensorList(Sensor.TYPE_PRESSURE);
-            if(sensors.size() > 0) {
-                sensor = sensors.get(0);
-                sensorManager.registerListener(new SensorEventCallback() {
-                    @Override
-                    public void onSensorChanged(SensorEvent event) {
-                        super.onSensorChanged(event);
-                        Log.d(TAG,"SensorManager presure = " + presure);
-                        presure = event.values[0];
-                    }
-                }, sensor, SensorManager.SENSOR_DELAY_NORMAL);
-            }
 
             LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-            Criteria criteria = new Criteria();
-            criteria.setAccuracy(Criteria.ACCURACY_COARSE);
-            criteria.setAltitudeRequired(true);
-            criteria.setPowerRequirement(Criteria.POWER_LOW);//低功耗
-            String provider = locationManager.getBestProvider(criteria, true);
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, new LocationListener() {
+//            Criteria criteria = new Criteria();
+////            criteria.setAccuracy(Criteria.ACCURACY_FINE);
+//            criteria.setVerticalAccuracy(Criteria.ACCURACY_HIGH);
+//            criteria.setHorizontalAccuracy(Criteria.ACCURACY_HIGH);
+//            criteria.setAltitudeRequired(true);
+//            criteria.setPowerRequirement(Criteria.POWER_LOW);//低功耗
+            String provider = LocationManager.GPS_PROVIDER;
+//            Log.d(TAG,"provider = " + provider);
+            locationManager.requestLocationUpdates(provider,1000, 0, new LocationListener() {
                 @Override
                 public void onLocationChanged(Location location) {
                     Log.d(TAG, "requestLocationData onLocationChanged Location = " + location.toString());
                     updateLocationData(location);
+                }
+            });
+            locationManager.addNmeaListener(new OnNmeaMessageListener() {
+                @Override
+                public void onNmeaMessage(String message, long timestamp) {
+                    //获取成功，停止监听，发布结果
+                    Log.d(TAG, "requestLocationData onNmeaMessage message = " + message);
+                    if (message.startsWith("$GPGGA") || message.startsWith("$GNGGA")) {
+                        String[] tokens = message.split(",");
+                        if (tokens.length < 10) return;
+                        if (tokens[9].isEmpty()) return;
+                        altitude = Double.parseDouble(tokens[9]);
+                        if (curLocationData != null) {
+                            curLocationData.setAltitude(altitude);
+                        }
+                    }
                 }
             });
             locationManager.registerGnssStatusCallback(new GnssStatus.Callback() {
@@ -105,7 +111,7 @@ public class LocationHelper {
                     }
                 }
             });
-            Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            Location location = locationManager.getLastKnownLocation(provider);
             if (location != null) {
                 Log.d(TAG, "getLocationData Location = " + location.toString() + " time = " + location.getTime());
                 updateLocationData(location);
@@ -118,10 +124,14 @@ public class LocationHelper {
     public static LocationData getLocationData(Activity context) {
         if (context != null) {
             LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-            Criteria criteria = new Criteria();
-            criteria.setAccuracy(Criteria.ACCURACY_COARSE);
-            criteria.setPowerRequirement(Criteria.POWER_LOW);//低功耗
-            criteria.setAltitudeRequired(true);
+//            Criteria criteria = new Criteria();
+////            criteria.setAccuracy(Criteria.ACCURACY_FINE);
+//            criteria.setVerticalAccuracy(Criteria.ACCURACY_HIGH);
+//            criteria.setHorizontalAccuracy(Criteria.ACCURACY_HIGH);
+//            criteria.setPowerRequirement(Criteria.POWER_LOW);//低功耗
+//            criteria.setAltitudeRequired(true);
+//            String provider = locationManager.getBestProvider(criteria, true);
+//            Log.d(TAG, "getLocationData provider = " + provider);
             Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
             if (location != null) {
                 Log.d(TAG, "getLocationData Location = " + location.toString() + " time = " + location.getTime());
@@ -133,47 +143,14 @@ public class LocationHelper {
     }
 
     private static void updateLocationData(Location location) {
-        float altitude = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, presure);
-        Log.d(TAG,"updateLocationData altitude = " + altitude + " presure = " + presure);
-        location.setAltitude(altitude);
+//        float altitude = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, presure);
+//        Log.d(TAG,"updateLocationData altitude = " + altitude + " presure = " + presure);
+//        location.setAltitude(altitude);
+        double alt = altitude != 0 ? altitude : location.getAltitude();
         if (curLocationData == null) {
-            curLocationData = new LocationData(location.getTime(), location.getLongitude(), location.getLatitude(), location.getAltitude());
+            curLocationData = new LocationData(location.getTime(), location.getLatitude(), location.getLongitude(), alt);
         } else {
-            curLocationData.updateData(location.getTime(), location.getLongitude(), location.getLatitude(), location.getAltitude());
+            curLocationData.updateData(location.getTime(), location.getLatitude(), location.getLongitude(), alt);
         }
     }
-
-//    private double getAltitude(Double longitude, Double latitude) {
-//        double result = Double.NaN;
-//        HttpClient httpClient = new DefaultHttpClient();
-//        HttpContext localContext = new BasicHttpContext();
-//        String url = "http://gisdata.usgs.gov/"
-//                + "xmlwebservices2/elevation_service.asmx/"
-//                + "getElevation?X_Value=" + String.valueOf(longitude)
-//                + "&Y_Value=" + String.valueOf(latitude)
-//                + "&Elevation_Units=METERS&Source_Layer=-1&Elevation_Only=true";
-//        HttpGet httpGet = new HttpGet(url);
-//        try {
-//            HttpResponse response = httpClient.execute(httpGet, localContext);
-//            HttpEntity entity = response.getEntity();
-//            if (entity != null) {
-//                InputStream instream = entity.getContent();
-//                int r = -1;
-//                StringBuffer respStr = new StringBuffer();
-//                while ((r = instream.read()) != -1)
-//                    respStr.append((char) r);
-//                String tagOpen = "<double>";
-//                String tagClose = "</double>";
-//                if (respStr.indexOf(tagOpen) != -1) {
-//                    int start = respStr.indexOf(tagOpen) + tagOpen.length();
-//                    int end = respStr.indexOf(tagClose);
-//                    String value = respStr.substring(start, end);
-//                    result = Double.parseDouble(value);
-//                }
-//                instream.close();
-//            }
-//        } catch (ClientProtocolException e) {}
-//        catch (IOException e) {}
-//        return result;
-//    }
 }

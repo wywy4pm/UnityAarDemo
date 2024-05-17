@@ -35,4 +35,18 @@ public class LocationData {
     public double getAltitude() {
         return mAltitude;
     }
+
+    public void setAltitude(double mAltitude) {
+        this.mAltitude = mAltitude;
+    }
+
+    @Override
+    public String toString() {
+        return "LocationData{" +
+                "mLatitude=" + mLatitude +
+                ", mLongitude=" + mLongitude +
+                ", mAltitude=" + mAltitude +
+                ", mTime=" + mTime +
+                '}';
+    }
 }
