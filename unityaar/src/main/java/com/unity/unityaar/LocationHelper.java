@@ -147,10 +147,11 @@ public class LocationHelper {
 //        Log.d(TAG,"updateLocationData altitude = " + altitude + " presure = " + presure);
 //        location.setAltitude(altitude);
         double alt = altitude != 0 ? altitude : location.getAltitude();
+        double[] coordinate = GPSFormat.transformWGS84ToGCJ(location.getLongitude(), location.getLatitude());
         if (curLocationData == null) {
-            curLocationData = new LocationData(location.getTime(), location.getLatitude(), location.getLongitude(), alt);
+            curLocationData = new LocationData(location.getTime(), coordinate[0], coordinate[1], alt);
         } else {
-            curLocationData.updateData(location.getTime(), location.getLatitude(), location.getLongitude(), alt);
+            curLocationData.updateData(location.getTime(), coordinate[0], coordinate[1], alt);
         }
     }
 }

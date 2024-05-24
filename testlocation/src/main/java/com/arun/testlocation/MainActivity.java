@@ -43,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
             locationData = LocationHelper.curLocationData;
             if (locationData != null && textView != null) {
                 //Log.d("LocationHelper","locationData = " + locationData.toString());
+
                 textView.setText(locationData.toString());
             }
             if (handler != null) {
